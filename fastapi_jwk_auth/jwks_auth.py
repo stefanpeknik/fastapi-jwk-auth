@@ -80,6 +80,11 @@ def jwk_validator(
 
 # JWT Token Validation Middleware
 class JWKMiddleware(BaseHTTPMiddleware):
+    def __init__(self, app, jwks_uri: str = JWKS_URI, algorithms: list = ALGORITHMS):
+        self.jwks_uri = jwks_uri
+        self.algorithms = algorithms
+        super().__init__(app)
+
     async def dispatch(
         self, request: Request, call_next: RequestResponseEndpoint
     ) -> Response:
