@@ -15,8 +15,14 @@ security = HTTPBearer()
 
 # Function to fetch the JSON Web Key Set (JWKS) from the JWKS URI
 def fetch_jwks(jwks_uri: str) -> Dict[str, Any]:
-    jwks_response = requests.get(jwks_uri)
+    try:
+        jwks_response = requests.get(jwks_uri)
+        jwks_response.raise_for_status()
+    except requests.RequestException as e:
+        raise ValueError(f"Failed to fetch JWKS: {e}")
     jwks: Dict[str, Any] = jwks_response.json()
+    if "keys" not in jwks:
+        raise ValueError("Invalid JWKS URI, no keys field found in JWKS response")
     return jwks
 
 
