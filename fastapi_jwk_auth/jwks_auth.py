@@ -6,6 +6,7 @@ from fastapi import Depends, HTTPException, Request, Response
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.types import ASGIApp
+from starlette.responses import JSONResponse
 
 __all__ = ["jwk_validator", "JWKMiddleware"]
 
@@ -124,7 +125,19 @@ class JWKMiddleware(BaseHTTPMiddleware):
             request.state.payload = get_validated_payload(
                 token, self.jwks_uri, self.algorithms
             )
+        # if starlette middleware is to raise any exception (even HTTPException),
+        # it has to be caught and parsed to a Response, otherwise it will create
+        # an internal server error and return 500
+        # even if the status code in HTTPException is set to other than 500
         except HTTPException as e:
-            return Response(content=e.detail, status_code=e.status_code)
+            return JSONResponse(
+                content={"detail": e.detail, "status": e.status_code},
+                status_code=e.status_code,
+            )
+        except Exception as e:
+            return JSONResponse(
+                content={"detail": "Internal Server Error", "status": 500},
+                status_code=500,
+            )
         response = await call_next(request)
         return response
