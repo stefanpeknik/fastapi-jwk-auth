@@ -8,18 +8,18 @@ from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoin
 
 __all__ = ["jwk_validator", "JWKMiddleware"]
 
-from .config import ALGORITHMS, JWKS_URI
-
 security = HTTPBearer()
+
+ALGORITHMS = ["RS256", "HS256"]
 
 
 # Function to fetch the JSON Web Key Set (JWKS) from the JWKS URI
-def fetch_jwks(jwks_uri: str = JWKS_URI) -> Dict[str, Any]:
+def fetch_jwks(jwks_uri: str) -> Dict[str, Any]:
     """
     This function fetches the JSON Web Key Set (JWKS) from the JWKS URI.
 
     Args:
-        jwks_uri (str): The URI to fetch the JWKS from. Defaults to JWKS_URI.
+        jwks_uri (str): The URI to fetch the JWKS from.
 
     Raises:
         ValueError: Failed to fetch JWKS.
@@ -40,7 +40,7 @@ def fetch_jwks(jwks_uri: str = JWKS_URI) -> Dict[str, Any]:
 
 
 def get_validated_payload(
-    token: str, jwks_uri: str = JWKS_URI, algorithms: List = ALGORITHMS
+    token: str, jwks_uri: str, algorithms: List = ALGORITHMS
 ) -> Any:
     """
     This function validates the jwt token and extracts
@@ -48,7 +48,7 @@ def get_validated_payload(
 
     Args:
         token (str): A valid JWT token
-        jwks_uri (str): The URI to fetch the JWKS from. Defaults to JWKS_URI.
+        jwks_uri (str): The URI to fetch the JWKS from.
         algorithms (List): A list of supported algorithms. Defaults to ALGORITHMS.
 
     Raises:
@@ -87,8 +87,8 @@ def get_validated_payload(
 # JWT Token Validation Middleware
 def jwk_validator(
     request: Request,
+    jwks_uri: str,
     credentials: HTTPAuthorizationCredentials = Depends(security),
-    jwks_uri: str = JWKS_URI,
     algorithms: List = ALGORITHMS,
 ) -> Request:
     token = credentials.credentials
@@ -100,15 +100,15 @@ def jwk_validator(
 
 # JWT Token Validation Middleware
 class JWKMiddleware(BaseHTTPMiddleware):
-    def __init__(self, app, jwks_uri: str = JWKS_URI, algorithms: List = ALGORITHMS):
+    def __init__(self, app, jwks_uri: str, algorithms: List = ALGORITHMS):
         """
         This middleware validates the JWT token using the JSON Web Key Set (JWKS)
         fetched from the JWKS URI.
 
         Args:
             app (FastAPI): The FastAPI app instance.
-            jwks_uri (str): The URI to fetch the JWKS from. Defaults to JWKS_URI.
-            algorithms (list): A list of supported algorithms. Defaults to ALGORITHMS.
+            jwks_uri (str): The URI to fetch the JWKS from.
+            algorithms (list): A list of supported algorithms.
         """
         self.jwks_uri = jwks_uri
         self.algorithms = algorithms
