@@ -5,6 +5,7 @@ import requests
 from fastapi import Depends, HTTPException, Request, Response
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
+from starlette.types import ASGIApp
 
 __all__ = ["jwk_validator", "JWKMiddleware"]
 
@@ -22,8 +23,7 @@ def fetch_jwks(jwks_uri: str) -> Dict[str, Any]:
         jwks_uri (str): The URI to fetch the JWKS from.
 
     Raises:
-        ValueError: Failed to fetch JWKS.
-        ValueError: Invalid JWKS URI, no keys field found in JWKS response.
+        HTTPException: If the JWKS URI is invalid or the JWKS is invalid.
 
     Returns:
         Dict[str, Any]: The JSON Web Key Set (JWKS) fetched from the JWKS URI.
@@ -32,10 +32,10 @@ def fetch_jwks(jwks_uri: str) -> Dict[str, Any]:
         jwks_response = requests.get(jwks_uri)
         jwks_response.raise_for_status()
     except requests.RequestException as e:
-        raise ValueError(f"Failed to fetch JWKS: {e}")
+        raise HTTPException(status_code=503, detail=f"Invalid JWKS URI")
     jwks: Dict[str, Any] = jwks_response.json()
     if "keys" not in jwks:
-        raise ValueError("Invalid JWKS URI, no keys field found in JWKS response")
+        raise HTTPException(status_code=503, detail=f"Invalid JWKS")
     return jwks
 
 
@@ -52,10 +52,7 @@ def get_validated_payload(
         algorithms (List): A list of supported algorithms. Defaults to ALGORITHMS.
 
     Raises:
-        HTTPException: The token uses an unknown algorithm.
-        HTTPException: The token uses an unknown key.
-        HTTPException: The token has expired.
-        HTTPException: The token is invalid.
+        HTTPException: If the token is invalid or has expired.
 
     Returns:
         Any: The payload of the validated JWT token.
@@ -100,13 +97,13 @@ def jwk_validator(
 
 # JWT Token Validation Middleware
 class JWKMiddleware(BaseHTTPMiddleware):
-    def __init__(self, app, jwks_uri: str, algorithms: List = ALGORITHMS):
+    def __init__(self, app: ASGIApp, jwks_uri: str, algorithms: List = ALGORITHMS):
         """
         This middleware validates the JWT token using the JSON Web Key Set (JWKS)
         fetched from the JWKS URI.
 
         Args:
-            app (FastAPI): The FastAPI app instance.
+            app (ASGIApp): The ASGI application.
             jwks_uri (str): The URI to fetch the JWKS from.
             algorithms (list): A list of supported algorithms.
         """
@@ -120,11 +117,14 @@ class JWKMiddleware(BaseHTTPMiddleware):
         bearer_token = request.headers.get("authorization") or request.headers.get(
             "Authorization"
         )
-        if not bearer_token or not bearer_token.startswith("Bearer "):
-            raise HTTPException(status_code=401, detail="Invalid token")
-        token = bearer_token[7:]
-        request.state.payload = get_validated_payload(
-            token, self.jwks_uri, self.algorithms
-        )
+        try:
+            if not bearer_token or not bearer_token.startswith("Bearer "):
+                raise HTTPException(status_code=401, detail="Invalid token")
+            token = bearer_token[7:]
+            request.state.payload = get_validated_payload(
+                token, self.jwks_uri, self.algorithms
+            )
+        except HTTPException as e:
+            return Response(content=e.detail, status_code=e.status_code)
         response = await call_next(request)
         return response
