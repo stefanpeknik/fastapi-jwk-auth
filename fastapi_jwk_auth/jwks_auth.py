@@ -140,13 +140,13 @@ class JWKMiddleware(BaseHTTPMiddleware):
         # an internal server error and return 500
         # even if the status code in HTTPException is set to other than 500
         except HTTPException as e:
-            logger.error(f"Error: {e.detail}")
+            logger.error(e.detail)
             return JSONResponse(
                 content={"detail": e.detail, "status": e.status_code},
                 status_code=e.status_code,
             )
         except Exception as e:
-            logger.error(f"Error: {e}")
+            logger.error(e)
             return JSONResponse(
                 content={"detail": "Internal Server Error", "status": 500},
                 status_code=500,
