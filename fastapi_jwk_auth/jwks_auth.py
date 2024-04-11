@@ -1,4 +1,5 @@
 from typing import Any, Dict, List
+import logging
 
 import jwt
 import requests
@@ -13,6 +14,8 @@ __all__ = ["jwk_validator", "JWKMiddleware"]
 security = HTTPBearer()
 
 ALGORITHMS = ["RS256", "HS256"]
+
+logger = logging.getLogger(__name__)
 
 
 # Function to fetch the JSON Web Key Set (JWKS) from the JWKS URI
@@ -30,12 +33,14 @@ def fetch_jwks(jwks_uri: str) -> Dict[str, Any]:
         Dict[str, Any]: The JSON Web Key Set (JWKS) fetched from the JWKS URI.
     """
     try:
+        logger.debug(f"Fetching JWKS from {jwks_uri}")
         jwks_response = requests.get(jwks_uri)
         jwks_response.raise_for_status()
     except requests.RequestException as e:
         raise HTTPException(status_code=503, detail=f"Invalid JWKS URI")
     jwks: Dict[str, Any] = jwks_response.json()
     if "keys" not in jwks:
+        logger.error(f"Invalid JWKS")
         raise HTTPException(status_code=503, detail=f"Invalid JWKS")
     return jwks
 
@@ -61,10 +66,14 @@ def get_validated_payload(
     jwks = fetch_jwks(jwks_uri)
     public_key = None
     try:
+        logger.debug(f"Validating token")
+        logger.debug("Supported algorithms: " + ", ".join(algorithms))
         header = jwt.get_unverified_header(token)
         kid = header["kid"]
         if header["alg"] not in algorithms:
+            logger.debug(f"Unsupported algorithm: {header['alg']}")
             raise HTTPException(status_code=401, detail="Invalid token")
+        logger.debug(f"Validating token with kid: {kid}")
         for key in jwks["keys"]:
             if key["kid"] == kid:
                 public_key = jwt.algorithms.get_default_algorithms()[
@@ -72,6 +81,7 @@ def get_validated_payload(
                 ].from_jwk(key)
                 break
         if public_key is None:
+            logger.debug("Token kid not found in JWKS")
             raise HTTPException(status_code=401, detail="Invalid token")
         return jwt.decode(token, public_key, algorithms=[header["alg"]])
     except jwt.ExpiredSignatureError:
@@ -130,11 +140,13 @@ class JWKMiddleware(BaseHTTPMiddleware):
         # an internal server error and return 500
         # even if the status code in HTTPException is set to other than 500
         except HTTPException as e:
+            logger.error(f"Error: {e.detail}")
             return JSONResponse(
                 content={"detail": e.detail, "status": e.status_code},
                 status_code=e.status_code,
             )
         except Exception as e:
+            logger.error(f"Error: {e}")
             return JSONResponse(
                 content={"detail": "Internal Server Error", "status": 500},
                 status_code=500,
