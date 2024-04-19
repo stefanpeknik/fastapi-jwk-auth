@@ -41,11 +41,11 @@ def fetch_jwks(jwks_uri: str) -> Dict[str, Any]:
         jwks_response.raise_for_status()
     except requests.RequestException as e:
         logger.error("Invalid JWKS URI")
-        raise HTTPException(status_code=503, detail=f"Invalid JWKS URI")
+        raise HTTPException(status_code=503, detail="Invalid JWKS URI") from e
     jwks: Dict[str, Any] = jwks_response.json()
     if "keys" not in jwks:
         logger.error("Invalid JWKS")
-        raise HTTPException(status_code=503, detail=f"Invalid JWKS")
+        raise HTTPException(status_code=503, detail="Invalid JWKS")
     return jwks
 
 
@@ -80,7 +80,9 @@ def get_validated_payload(
         kid = header["kid"]
         if header["alg"] not in algorithms:
             logger.debug("Unsupported algorithm: %s", header["alg"])
-            raise HTTPException(status_code=401, detail="Invalid token")
+            raise HTTPException(
+                status_code=401, detail="Invalid token: Unsupported algorithm"
+            )
         logger.debug("Validating token with kid: %s", kid)
         for key in jwks["keys"]:
             if key["kid"] == kid:
@@ -90,16 +92,18 @@ def get_validated_payload(
                 break
         if public_key is None:
             logger.debug("Token kid not found in JWKS")
-            raise HTTPException(status_code=401, detail="Invalid token")
+            raise HTTPException(
+                status_code=401, detail="Invalid token: kid not found in JWKS"
+            )
         return jwt.decode(
             token, public_key, algorithms=[header["alg"]], options=options
         )
-    except jwt.ExpiredSignatureError:
-        raise HTTPException(status_code=401, detail="Token has expired")
-    except jwt.InvalidTokenError:
-        raise HTTPException(status_code=401, detail="Invalid token")
-    except KeyError:
-        raise HTTPException(status_code=401, detail="Invalid token")
+    except jwt.ExpiredSignatureError as e:
+        raise HTTPException(status_code=401, detail=f"Token has expired: {e}") from e
+    except jwt.InvalidTokenError as e:
+        raise HTTPException(status_code=401, detail=f"Invalid token: {e}") from e
+    except KeyError as e:
+        raise HTTPException(status_code=401, detail=f"Invalid token: {e}") from e
 
 
 # JWT Token Validation Middleware
@@ -129,7 +133,9 @@ def jwk_validator(
     """
     token = credentials.credentials
     if credentials.scheme != "Bearer" or not token:
-        raise HTTPException(status_code=401, detail="Invalid token")
+        raise HTTPException(
+            status_code=401, detail="Invalid token: Missing Bearer token"
+        )
     request.state.payload = get_validated_payload(token, jwks_uri, options, algorithms)
     return request
 
@@ -166,7 +172,9 @@ class JWKMiddleware(BaseHTTPMiddleware):
         )
         try:
             if not bearer_token or not bearer_token.startswith("Bearer "):
-                raise HTTPException(status_code=401, detail="Invalid token")
+                raise HTTPException(
+                    status_code=401, detail="Invalid token: Missing Bearer token"
+                )
             token = bearer_token[7:]
             request.state.payload = get_validated_payload(
                 token, self.jwks_uri, self.options, self.algorithms
