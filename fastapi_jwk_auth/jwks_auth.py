@@ -110,6 +110,23 @@ def jwk_validator(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     algorithms: List = ALGORITHMS,
 ) -> Request:
+    """
+    This dependency function validates the JWT token using the JSON Web Key Set (JWKS)
+    fetched from the JWKS URI.
+
+    Args:
+        request (Request): The request object.
+        jwks_uri (str): The URI to fetch the JWKS from.
+        options (dict|None): Options to pass to the JWT library for decoding the token. Defaults to None.
+        credentials (HTTPAuthorizationCredentials): The HTTP Authorization credentials.
+        algorithms (list): A list of supported algorithms.
+
+    Raises:
+        HTTPException: If the token is invalid or has expired.
+
+    Returns:
+        Request: The request object with the payload of the validated JWT token.
+    """
     token = credentials.credentials
     if credentials.scheme != "Bearer" or not token:
         raise HTTPException(status_code=401, detail="Invalid token")
