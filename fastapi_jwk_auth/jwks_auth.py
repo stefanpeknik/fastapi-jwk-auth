@@ -46,7 +46,10 @@ def fetch_jwks(jwks_uri: str) -> Dict[str, Any]:
 
 
 def get_validated_payload(
-    token: str, jwks_uri: str, algorithms: List = ALGORITHMS
+    token: str,
+    jwks_uri: str,
+    options: dict[str, Any] | None = None,
+    algorithms: List = ALGORITHMS,
 ) -> Any:
     """
     This function validates the jwt token and extracts
@@ -55,6 +58,7 @@ def get_validated_payload(
     Args:
         token (str): A valid JWT token
         jwks_uri (str): The URI to fetch the JWKS from.
+        options (dict|None): Options to pass to the JWT library for decoding the token. Defaults to None.
         algorithms (List): A list of supported algorithms. Defaults to ALGORITHMS.
 
     Raises:
@@ -83,7 +87,9 @@ def get_validated_payload(
         if public_key is None:
             logger.debug("Token kid not found in JWKS")
             raise HTTPException(status_code=401, detail="Invalid token")
-        return jwt.decode(token, public_key, algorithms=[header["alg"]])
+        return jwt.decode(
+            token, public_key, algorithms=[header["alg"]], options=options
+        )
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Token has expired")
     except jwt.InvalidTokenError:
@@ -96,19 +102,26 @@ def get_validated_payload(
 def jwk_validator(
     request: Request,
     jwks_uri: str,
+    options: dict[str, Any] | None = None,
     credentials: HTTPAuthorizationCredentials = Depends(security),
     algorithms: List = ALGORITHMS,
 ) -> Request:
     token = credentials.credentials
     if credentials.scheme != "Bearer" or not token:
         raise HTTPException(status_code=401, detail="Invalid token")
-    request.state.payload = get_validated_payload(token, jwks_uri, algorithms)
+    request.state.payload = get_validated_payload(token, jwks_uri, options, algorithms)
     return request
 
 
 # JWT Token Validation Middleware
 class JWKMiddleware(BaseHTTPMiddleware):
-    def __init__(self, app: ASGIApp, jwks_uri: str, algorithms: List = ALGORITHMS):
+    def __init__(
+        self,
+        app: ASGIApp,
+        jwks_uri: str,
+        options: dict[str, Any] | None = None,
+        algorithms: List = ALGORITHMS,
+    ):
         """
         This middleware validates the JWT token using the JSON Web Key Set (JWKS)
         fetched from the JWKS URI.
@@ -116,10 +129,12 @@ class JWKMiddleware(BaseHTTPMiddleware):
         Args:
             app (ASGIApp): The ASGI application.
             jwks_uri (str): The URI to fetch the JWKS from.
+            options (dict|None): Options to pass to the JWT library for decoding the token. Defaults to None.
             algorithms (list): A list of supported algorithms.
         """
         self.jwks_uri = jwks_uri
         self.algorithms = algorithms
+        self.options = options
         super().__init__(app)
 
     async def dispatch(
@@ -133,7 +148,7 @@ class JWKMiddleware(BaseHTTPMiddleware):
                 raise HTTPException(status_code=401, detail="Invalid token")
             token = bearer_token[7:]
             request.state.payload = get_validated_payload(
-                token, self.jwks_uri, self.algorithms
+                token, self.jwks_uri, self.options, self.algorithms
             )
         # if starlette middleware is to raise any exception (even HTTPException),
         # it has to be caught and parsed to a Response, otherwise it will create
