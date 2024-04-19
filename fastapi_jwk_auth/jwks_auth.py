@@ -13,7 +13,10 @@ __all__ = ["jwk_validator", "JWKMiddleware"]
 
 security = HTTPBearer()
 
-ALGORITHMS = ["RS256", "HS256"]
+ALGORITHMS = ("RS256", "HS256")
+"""
+Default supported algorithms for JWT token validation.
+"""
 
 logger = logging.getLogger(__name__)
 
