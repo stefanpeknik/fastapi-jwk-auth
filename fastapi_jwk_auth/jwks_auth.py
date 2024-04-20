@@ -54,7 +54,7 @@ def get_validated_payload(
     jwks_uri: str,
     options: dict[str, Any] | None = None,
     algorithms: List = ALGORITHMS,
-) -> Any:
+) -> Dict[str, Any]:
     """
     This function validates the jwt token and extracts
     the payload from it.
@@ -69,7 +69,7 @@ def get_validated_payload(
         HTTPException: If the token is invalid or has expired.
 
     Returns:
-        Any: The payload of the validated JWT token.
+        Dict[str, Any]: The payload of the validated JWT token.
     """
     jwks = fetch_jwks(jwks_uri)
     public_key = None
