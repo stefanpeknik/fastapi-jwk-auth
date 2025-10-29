@@ -25,30 +25,25 @@ pip install fastapi-jwk-auth
 
 ```python
 from fastapi import FastAPI, Depends
-from fastapi_jwk_auth.jwks_auth import jwk_validator, JWKMiddleware
+from fastapi_jwk_auth.jwks_auth import JWKMiddleware
 
 app = FastAPI()
 
 # Include the JWT Middleware
-app.add_middleware(JWTMiddleware)
+app.add_middleware(JWTMiddleware, jwks_uri="your_jwks_uri")
 ```
 
 ## FastAPI Route JWT Validation
 
 ```python
 from fastapi import FastAPI, Depends
-from fastapi_jwk_auth.jwks_auth import jwk_validator, JWKMiddleware
+from fastapi_jwk_auth.jwks_auth import jwk_validator
+from functools import partial
 
-app=FastAPI()
+app = FastAPI()
 
-app.include_router(auth_app.router, dependencies=[Depends(jwk_validator)])
-```
-
-## Configuration
-Set the following environment variable to the JSON Web Key Set (JWKS) URI:
-
-```bash
-export JWK_HOST="https://your-identity-server"
+jwk_validator_with_uri = partial(jwk_validator, jwks_uri="your_jwks_uri")
+app.include_router(auth_app.router, dependencies=[Depends(jwk_validator_with_uri)])
 ```
 
 ## Contributing
