@@ -20,6 +20,14 @@ Install the package using pip:
 ```bash
 pip install fastapi-jwk-auth
 ```
+
+### Development
+
+This project uses [uv](https://docs.astral.sh/uv/) for dependency management:
+
+```bash
+uv sync --extra dev
+```
 # Usage
 ## FastAPI Middleware Integration
 

@@ -1,0 +1,87 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "fastapi-jwk-auth"
+version = "0.0.6"
+description = "FastAPI JWKS Auth Validator - enhance FastAPI applications with easy and secure JWT validation using JSON Web Key Sets (JWKS)"
+authors = [
+    {name = "omkardarves", email = "omkardarves@gmail.com"},
+    {name = "Stefan Peknik", email = "speknik@redhat.com"}
+]
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.8.1"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Framework :: FastAPI",
+    "Topic :: Internet :: WWW/HTTP",
+    "Topic :: Security :: Cryptography",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+keywords = ["fastapi", "jwt", "jwks", "authentication", "security"]
+
+dependencies = [
+    "fastapi>=0.110.0",
+    "PyJWT>=2.1.0",
+    "requests>=2.31.0",
+    "starlette>=0.36.3",
+    "cryptography",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "httpx>=0.24.0",
+    "black>=23.0.0",
+    "isort>=5.0.0",
+    "flake8>=6.0.0",
+    "mypy>=1.0.0",
+]
+test = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "httpx>=0.24.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/omkardarves/fastapi-jwk-auth"
+Repository = "https://github.com/omkardarves/fastapi-jwk-auth"
+Issues = "https://github.com/omkardarves/fastapi-jwk-auth/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["fastapi_jwk_auth"]
+
+[tool.black]
+line-length = 88
+target-version = ['py38']
+include = '\.pyi?$'
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+line_length = 88
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v"
