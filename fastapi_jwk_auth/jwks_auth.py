@@ -1,7 +1,8 @@
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, Tuple, Union
 import logging
 
 import jwt
+from jwt.algorithms import get_default_algorithms
 import requests
 from fastapi import Depends, HTTPException, Request, Response
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -9,11 +10,10 @@ from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoin
 from starlette.types import ASGIApp
 from starlette.responses import JSONResponse
 
-__all__ = ["jwk_validator", "JWKMiddleware"]
 
 security = HTTPBearer()
 
-ALGORITHMS = ("RS256", "HS256")
+ALGORITHMS: Tuple[str, ...] = ("RS256", "HS256")
 """
 Default supported algorithms for JWT token validation.
 """
@@ -52,9 +52,9 @@ def fetch_jwks(jwks_uri: str) -> Dict[str, Any]:
 def get_validated_payload(
     token: str,
     jwks_uri: str,
-    options: dict[str, Any] | None = None,
-    algorithms: List = ALGORITHMS,
-) -> Dict[str, Any]:
+    options: Optional[Dict[str, Any]] = None,
+    algorithms: Tuple[str, ...] = ALGORITHMS,
+) -> Any:
     """
     This function validates the jwt token and extracts
     the payload from it.
@@ -69,7 +69,7 @@ def get_validated_payload(
         HTTPException: If the token is invalid or has expired.
 
     Returns:
-        Dict[str, Any]: The payload of the validated JWT token.
+        Any: The payload of the validated JWT token.
     """
     jwks = fetch_jwks(jwks_uri)
     public_key = None
@@ -86,9 +86,13 @@ def get_validated_payload(
         logger.debug("Validating token with kid: %s", kid)
         for key in jwks["keys"]:
             if key["kid"] == kid:
-                public_key = jwt.algorithms.get_default_algorithms()[
-                    header["alg"]
-                ].from_jwk(key)
+                algorithm_cls = get_default_algorithms().get(header["alg"])
+                if algorithm_cls is None:
+                    logger.debug("Algorithm %s not found in default algorithms", header["alg"])
+                    raise HTTPException(
+                        status_code=401, detail="Invalid token: Unsupported algorithm"
+                    )
+                public_key = algorithm_cls.from_jwk(key)
                 break
         if public_key is None:
             logger.debug("Token kid not found in JWKS")
@@ -110,9 +114,9 @@ def get_validated_payload(
 def jwk_validator(
     request: Request,
     jwks_uri: str,
-    options: dict[str, Any] | None = None,
+    options: Optional[Dict[str, Any]] = None,
     credentials: HTTPAuthorizationCredentials = Depends(security),
-    algorithms: List = ALGORITHMS,
+    algorithms: Tuple[str, ...] = ALGORITHMS,
 ) -> Request:
     """
     This dependency function validates the JWT token using the JSON Web Key Set (JWKS)
@@ -146,9 +150,9 @@ class JWKMiddleware(BaseHTTPMiddleware):
         self,
         app: ASGIApp,
         jwks_uri: str,
-        options: dict[str, Any] | None = None,
-        algorithms: List = ALGORITHMS,
-    ):
+        options: Optional[Dict[str, Any]] = None,
+        algorithms: Tuple[str, ...] = ALGORITHMS,
+    ) -> None:
         """
         This middleware validates the JWT token using the JSON Web Key Set (JWKS)
         fetched from the JWKS URI.
